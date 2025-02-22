@@ -1,0 +1,99 @@
+import fitz  # PyMuPDF
+import pandas as pd
+import re
+
+# Define the PDF file path
+pdf_path = "courses123.pdf"
+
+# Open the PDF
+doc = fitz.open(pdf_path)
+
+# Data storage
+data = []
+current_department = None
+
+# Define patterns to extract fields
+course_pattern = re.compile(r"^([A-Z\s&]+)\s*\((\w+)\)$")  # Department name
+code_title_pattern = re.compile(r"^(\w+\s+\d+)\s+—\s+(.+)$")  # Course code and title
+credits_pattern = re.compile(r"(\d+)\s+credits")
+requisites_pattern = re.compile(r"Requisites:\s*(.+)")
+repeatable_pattern = re.compile(r"Repeatable for Credit:\s*(Yes|No)")
+last_taught_pattern = re.compile(r"Last Taught:\s*(.+)")
+learning_outcomes_pattern = re.compile(r"Learning Outcomes:")
+
+# Iterate through each page
+for page in doc:
+    text = page.get_text("text")  # Extract text
+    lines = text.split("\n")
+
+    course_code, course_title, credits, description = None, None, None, ""
+    requisites, repeatable, last_taught, learning_outcomes = None, None, None, []
+
+    for line in lines:
+        line = line.strip()
+        
+        # Check for department header
+        dept_match = course_pattern.match(line)
+        if dept_match:
+            current_department = dept_match.group(1)
+            continue  # Move to next line
+        
+        # Check for course code and title
+        course_match = code_title_pattern.match(line)
+        if course_match:
+            # Save the previous course before starting a new one
+            if course_code:
+                data.append([
+                    current_department, course_code, course_title, credits, 
+                    description.strip(), requisites, repeatable, last_taught, 
+                    " | ".join(learning_outcomes)
+                ])
+            
+            course_code, course_title = course_match.groups()
+            credits, description, requisites, repeatable, last_taught, learning_outcomes = None, "", None, None, None, []
+            continue  # Move to next line
+        
+        # Extract other fields
+        if not credits:
+            credits_match = credits_pattern.search(line)
+            if credits_match:
+                credits = credits_match.group(1)
+        
+        requisites_match = requisites_pattern.match(line)
+        if requisites_match:
+            requisites = requisites_match.group(1)
+        
+        repeatable_match = repeatable_pattern.match(line)
+        if repeatable_match:
+            repeatable = repeatable_match.group(1)
+        
+        last_taught_match = last_taught_pattern.match(line)
+        if last_taught_match:
+            last_taught = last_taught_match.group(1)
+        
+        if learning_outcomes_pattern.match(line):
+            continue  # Skip header line for learning outcomes
+        
+        if re.match(r"\d+\.", line):  # Learning outcomes numbered list
+            learning_outcomes.append(line)
+        else:
+            description += " " + line  # Add to description
+    
+    # Save last course
+    if course_code:
+        data.append([
+            current_department, course_code, course_title, credits, 
+            description.strip(), requisites, repeatable, last_taught, 
+            " | ".join(learning_outcomes)
+        ])
+
+# Convert to DataFrame
+df = pd.DataFrame(data, columns=[
+    "Department", "Course Code", "Course Title", "Credits", "Description",
+    "Requisites", "Repeatable for Credit", "Last Taught", "Learning Outcomes"
+])
+
+# Save to CSV
+df.to_csv("courses123.csv", index=False)
+
+print("Data extraction complete. CSV saved as 'courses.csv'.")
