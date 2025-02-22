@@ -1,0 +1,38 @@
+import json
+import pandas as pd
+
+# Load the JSON data from your file
+with open('/content/OrgAPI_Data.txt', 'r') as file:
+    data = json.load(file)
+
+# Extract the list of records from the JSON
+records = data.get('value', [])
+
+# Flatten the nested fields for each record
+flattened_data = []
+for record in records:
+    flattened_record = {
+        'Id': record.get('Id'),
+        'InstitutionId': record.get('InstitutionId'),
+        'ParentOrganizationId': record.get('ParentOrganizationId'),
+        'BranchId': record.get('BranchId'),
+        'Name': record.get('Name'),
+        'ShortName': record.get('ShortName'),
+        'WebsiteKey': record.get('WebsiteKey'),
+        'ProfilePicture': record.get('ProfilePicture'),
+        'Description': record.get('Description'),
+        'Summary': record.get('Summary'),
+        'Status': record.get('Status'),
+        'Visibility': record.get('Visibility'),
+        'CategoryIds': ', '.join(record.get('CategoryIds', [])),
+        'CategoryNames': ', '.join(record.get('CategoryNames', []))
+    }
+    flattened_data.append(flattened_record)
+
+# Convert the flattened data to a DataFrame
+df = pd.DataFrame(flattened_data)
+
+# Save to a CSV file
+df.to_csv('output.csv', index=False)
+
+print("CSV file has been created successfully.")
